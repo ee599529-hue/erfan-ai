@@ -2,6 +2,87 @@ const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const ALLOWED_ORIGIN = "https://erfan-vision.netlify.app";
 const MARKET_URL = "https://xaus.com/api/v1/chart";
 
+
+function calculateEMA(values, period) {
+  if (!Array.isArray(values) || values.length < period) {
+    return null;
+  }
+
+function calculateRSI(values, period = 14) {
+  if (!Array.isArray(values) || values.length <= period) {
+    return null;
+  }
+
+function calculateMACD(values) {
+  if (!Array.isArray(values) || values.length < 35) {
+    return null;
+  }
+
+  const ema12 = calculateEMA(values, 12);
+  const ema26 = calculateEMA(values, 26);
+
+  if (ema12 === null || ema26 === null) {
+    return null;
+  }
+
+  const macdLine = ema12 - ema26;
+
+  const macdHistory = [];
+
+  for (let i = 26; i < values.length; i++) {
+    const shortEMA = calculateEMA(values.slice(0, i + 1), 12);
+    const longEMA = calculateEMA(values.slice(0, i + 1), 26);
+    macdHistory.push(shortEMA - longEMA);
+  }
+
+  const signal = calculateEMA(macdHistory, 9);
+  if (signal === null) return null;
+
+  return {
+    macd: Number(macdLine.toFixed(2)),
+    signal: Number(signal.toFixed(2)),
+    histogram: Number((macdLine - signal).toFixed(2))
+  };
+}
+
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const change = values[i] - values[i - 1];
+    if (change > 0) gains += change;
+    else losses -= change;
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  for (let i = period + 1; i < values.length; i++) {
+    const change = values[i] - values[i - 1];
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+
+  if (avgLoss === 0) return 100;
+
+  const rs = avgGain / avgLoss;
+  return Number((100 - 100 / (1 + rs)).toFixed(2));
+}
+
+  const multiplier = 2 / (period + 1);
+  let ema = values
+    .slice(0, period)
+    .reduce((sum, value) => sum + value, 0) / period;
+
+  for (let i = period; i < values.length; i++) {
+    ema = (values[i] - ema) * multiplier + ema;
+  }
+
+  return Number(ema.toFixed(2));
+}
 const SYSTEM_PROMPT = `You are ERFAN AI, the helpful assistant for ERFAN VISION.
 Reply in the same language as the user: Dari Persian, Persian, or English.
 For Dari, use clear and natural Afghan Dari.
@@ -42,6 +123,64 @@ export default {
       return json({ error: "Origin not allowed" }, 403, origin);
     }
 
+function analyzeGold(data) {
+  if (!data || !Array.isArray(data.points)) {
+    return { error: "Invalid gold market data" };
+  }
+
+  const candles = data.points.filter(
+    p => Number.isFinite(Number(p.c)) && Number(p.c) > 0
+  );
+
+  const closes = candles.map(p => Number(p.c));
+
+  if (closes.length < 200) {
+    return {
+      error: "Not enough candles for reliable analysis",
+      candles: closes.length
+    };
+  }
+
+  const ema20 = calculateEMA(closes, 20);
+  const ema50 = calculateEMA(closes, 50);
+  const ema200 = calculateEMA(closes, 200);
+  const rsi = calculateRSI(closes, 14);
+  const macd = calculateMACD(closes);
+
+  if (rsi === null || !macd) {
+    return { error: "Indicator calculation failed" };
+  }
+
+  const price = closes[closes.length - 1];
+
+  let bias = "NEUTRAL";
+
+  if (price > ema20 && ema20 > ema50 && ema50 > ema200) {
+    bias = "BULLISH";
+  } else if (price < ema20 && ema20 < ema50 && ema50 < ema200) {
+    bias = "BEARISH";
+  }
+
+  let signal = "WAIT";
+
+  if (bias === "BULLISH" && rsi > 50 && macd.histogram > 0) {
+    signal = "BUY";
+  } else if (bias === "BEARISH" && rsi < 50 && macd.histogram < 0) {
+    signal = "SELL";
+  }
+
+  return {
+    symbol: "XAUUSD",
+    price,
+    timeframe: data.interval,
+    indicators: { ema20, ema50, ema200, rsi, macd },
+    bias,
+    signal,
+    candles: closes.length,
+    note: "Technical analysis only. Not a guaranteed prediction."
+  };
+}
+
     if (request.method === "GET" && url.pathname === "/market/xau") {
       const range = url.searchParams.get("range") || "5d";
       const interval = url.searchParams.get("interval") || "15m";
@@ -68,8 +207,19 @@ export default {
         }
 
         try {
-          const data = JSON.parse(body);
-          return json({ symbol: "XAUUSD", range, interval, source: "XAUS", data }, 200, origin);
+          
+const data = JSON.parse(body);
+const analysis = analyzeGold(data);
+
+return json({
+  symbol: "XAUUSD",
+  range,
+  interval,
+  source: "XAUS",
+  data,
+  analysis
+}, 200, origin);
+
         } catch {
           return json({ error: "Market data provider did not return valid JSON" }, 502, origin);
         }
