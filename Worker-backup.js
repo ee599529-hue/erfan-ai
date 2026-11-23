@@ -1,4 +1,3 @@
-
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const ALLOWED_ORIGIN = "https://erfan-vision.netlify.app";
 const MARKET_URL = "https://xaus.com/api/v1/chart";
