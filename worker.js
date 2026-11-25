@@ -1,5 +1,8 @@
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-const ALLOWED_ORIGIN = "https://erfan-vision.netlify.app";
+const ALLOWED_ORIGINS = new Set([
+  "https://erfan-vision.netlify.app",
+  "https://rainbow-bavarois-8e2a81.netlify.app"
+]);
 const MARKET_URL = "https://xaus.com/api/v1/chart";
 
 
@@ -92,7 +95,7 @@ Keep answers clear, friendly, and reasonably concise.`;
 
 function corsHeaders(origin) {
   return {
-    "Access-Control-Allow-Origin": origin === ALLOWED_ORIGIN ? ALLOWED_ORIGIN : "null",
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin) ? origin : "null",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Vary": "Origin"
@@ -119,7 +122,7 @@ export default {
       return json({ status: "ok", assistant: "ERFAN AI", market_endpoint: "/market/xau" }, 200, origin);
     }
 
-    if (origin !== ALLOWED_ORIGIN) {
+    if (!ALLOWED_ORIGINS.has(origin)) {
       return json({ error: "Origin not allowed" }, 403, origin);
     }
 
