@@ -6,47 +6,28 @@ const ALLOWED_ORIGINS = new Set([
 const MARKET_URL = "https://xaus.com/api/v1/chart";
 
 
+
 function calculateEMA(values, period) {
   if (!Array.isArray(values) || values.length < period) {
     return null;
   }
 
+  const multiplier = 2 / (period + 1);
+  let ema = values
+    .slice(0, period)
+    .reduce((sum, value) => sum + value, 0) / period;
+
+  for (let i = period; i < values.length; i++) {
+    ema = (values[i] - ema) * multiplier + ema;
+  }
+
+  return Number(ema.toFixed(2));
+}
+
 function calculateRSI(values, period = 14) {
   if (!Array.isArray(values) || values.length <= period) {
     return null;
   }
-
-function calculateMACD(values) {
-  if (!Array.isArray(values) || values.length < 35) {
-    return null;
-  }
-
-  const ema12 = calculateEMA(values, 12);
-  const ema26 = calculateEMA(values, 26);
-
-  if (ema12 === null || ema26 === null) {
-    return null;
-  }
-
-  const macdLine = ema12 - ema26;
-
-  const macdHistory = [];
-
-  for (let i = 26; i < values.length; i++) {
-    const shortEMA = calculateEMA(values.slice(0, i + 1), 12);
-    const longEMA = calculateEMA(values.slice(0, i + 1), 26);
-    macdHistory.push(shortEMA - longEMA);
-  }
-
-  const signal = calculateEMA(macdHistory, 9);
-  if (signal === null) return null;
-
-  return {
-    macd: Number(macdLine.toFixed(2)),
-    signal: Number(signal.toFixed(2)),
-    histogram: Number((macdLine - signal).toFixed(2))
-  };
-}
 
   let gains = 0;
   let losses = 0;
@@ -75,17 +56,38 @@ function calculateMACD(values) {
   return Number((100 - 100 / (1 + rs)).toFixed(2));
 }
 
-  const multiplier = 2 / (period + 1);
-  let ema = values
-    .slice(0, period)
-    .reduce((sum, value) => sum + value, 0) / period;
-
-  for (let i = period; i < values.length; i++) {
-    ema = (values[i] - ema) * multiplier + ema;
+function calculateMACD(values) {
+  if (!Array.isArray(values) || values.length < 35) {
+    return null;
   }
 
-  return Number(ema.toFixed(2));
+  const ema12 = calculateEMA(values, 12);
+  const ema26 = calculateEMA(values, 26);
+
+  if (ema12 === null || ema26 === null) {
+    return null;
+  }
+
+  const macdLine = ema12 - ema26;
+  const macdHistory = [];
+
+  for (let i = 26; i < values.length; i++) {
+    const shortEMA = calculateEMA(values.slice(0, i + 1), 12);
+    const longEMA = calculateEMA(values.slice(0, i + 1), 26);
+    macdHistory.push(shortEMA - longEMA);
+  }
+
+  const signal = calculateEMA(macdHistory, 9);
+  if (signal === null) return null;
+
+  return {
+    macd: Number(macdLine.toFixed(2)),
+    signal: Number(signal.toFixed(2)),
+    histogram: Number((macdLine - signal).toFixed(2))
+  };
 }
+
+
 const SYSTEM_PROMPT = `You are ERFAN AI, the helpful assistant for ERFAN VISION.
 Reply in the same language as the user: Dari Persian, Persian, or English.
 For Dari, use clear and natural Afghan Dari.
